@@ -29,12 +29,12 @@ class CombinationGenerator {
     }
     private boolean f( List<Integer> res, long k, int cur, int idx ) {
         if ( cur == M )
-            return k == 0;
-        if ( idx > N || cur > M || C[N-idx][M-cur] <= k ) return false ;
+            return k == 0L;
+        if ( idx >= N || cur >= M || C[N-idx][M-cur] <= k ) return false ;
         long sum = 0;
         assert sum <= k;
-        for ( int i = idx; i < N; sum += C[N-i][M-cur], ++i )
-            if ( sum+C[N-i][M-cur] > k ) {
+        for ( int i = idx; i < N; sum += C[N-i-1][M-cur-1], ++i )
+            if ( sum+C[N-i-1][M-cur-1] > k ) {
                 res.add(i);
                 return f(res,k-sum,cur+1,i+1);
             }
@@ -42,8 +42,8 @@ class CombinationGenerator {
     }
     public List<Integer> generateLexCombination( long k ) {
         if ( !(0 <= k && k < C[N][M]) )
-            throw new IllegalArgumentException(String.format("Not true: %ld <= %ld <= %ld\n",0L,k,C[N][M]));
-        List<Integer> res = new ArrayList<>();
+            throw new IllegalArgumentException(String.format("Not true: %d <= %d <= %d\n",0L,k,C[N][M]));
+        List<Integer> res = new ArrayList<Integer>();
         if ( !f(res,k,0,0) )
             return null;
         return res;
@@ -79,7 +79,7 @@ enum PokerHandType {
     TWO_PAIRS(2) {
         @Override
         public boolean is( int card ) {
-            Map<Integer,Integer> cnt = new HashMap<>();
+            Map<Integer,Integer> cnt = new HashMap<Integer,Integer>();
             for ( int i = 0; i < CombinationGenerator.M; ++i ) {
                 int rank = PokerHandType.getRank(getCard(card,i));
                 if ( cnt.containsKey(rank) )
@@ -96,7 +96,7 @@ enum PokerHandType {
     THREE_OF_A_KIND(3) {
         @Override
         public boolean is( int card ) {
-            Map<Integer,Integer> cnt = new HashMap<>();
+            Map<Integer,Integer> cnt = new HashMap<Integer,Integer>();
             for ( int i = 0; i < CombinationGenerator.M; ++i ) {
                 int rank = PokerHandType.getRank(getCard(card,i));
                 if ( cnt.containsKey(rank) )
@@ -132,7 +132,7 @@ enum PokerHandType {
     FULL_HOUSE(6) {
         @Override
         public boolean is( int card ) {
-            Map<Integer,Integer> cnt = new HashMap<>();
+            Map<Integer,Integer> cnt = new HashMap<Integer,Integer>();
             for ( int i = 0; i < CombinationGenerator.M; ++i ) {
                 int rank = PokerHandType.getRank(getCard(card,i));
                 if ( cnt.containsKey(rank) )
@@ -149,7 +149,7 @@ enum PokerHandType {
     FOUR_OF_A_KIND(7) {
         @Override
         public boolean is( int card ) {
-            Map<Integer,Integer> cnt = new HashMap<>();
+            Map<Integer,Integer> cnt = new HashMap<Integer, Integer>();
             for ( int i = 0; i < CombinationGenerator.M; ++i ) {
                 int rank = PokerHandType.getRank(getCard(card,i));
                 if ( cnt.containsKey(rank) )
@@ -215,12 +215,11 @@ enum PokerHandType {
 
 class PokerHandDetector {
     public static PokerHandType detect( int []cards ) {
-        int encoding = 0;
-        for ( int i = 0; i < CombinationGenerator.M; ++i )
-            encoding |= (cards[i]<<(6*i));
+        int hand = 0;
+        for ( int i = 0; i < CombinationGenerator.M; hand |= (cards[i]<<(6*i)), ++i ) ;
         PokerHandType []types = PokerHandType.values();
         for ( int i = types.length-1; i >= 0; --i )
-            if ( types[i].is(encoding) )
+            if ( types[i].is(hand) )
                 return types[i];
         return null;
     }
@@ -236,19 +235,19 @@ public class HDPMapper extends Mapper<LongWritable, Text, Text, IntWritable> {
         String text = value.toString();
         for ( String line: text.split("\n") ) {
             long k = new Scanner(line).nextLong();
-            List<Integer> res = generator.generateLexCombination(k);
+            List<Integer> res = generator.generateShuffledCombination(k);
             if ( res == null )
-                throw new IllegalStateException("Couldn't fine combination with lex number "+k);
+                throw new IllegalStateException("Couldn't find combination with lex number "+k);
             StringBuilder sb = new StringBuilder();
             int m = 0;
             for ( Integer x: res ) {
                 assert 0 <= x && x < CombinationGenerator.N;
                 int suit = (x/13), rank = (x%13);
                 assert suit >= 0 && suit <= 3;
-                sb.append((suit+1)+" "+(((rank+1)%13)+1));
+                sb.append((suit+1)+" "+(rank==12?1:rank+2)+" ");
                 cards[m++] = suit|(rank<<2);
             }
-            sb.append(" "+PokerHandDetector.detect(cards).toString());
+            sb.append(PokerHandDetector.detect(cards).toString());
             word.set(sb.toString());
             con.write(word,ONE);
         }
